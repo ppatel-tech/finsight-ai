@@ -9,3 +9,10 @@ public class DuplicateResourceException extends RuntimeException{
         super(message);
     }
 }
+
+//Why extend RuntimeException not Exception?
+//Checked exceptions (Exception) force every caller to
+//declare throws or wrap in try-catch. That creates noise
+//throughout your codebase. Spring handles
+//unchecked exceptions (RuntimeException) cleanly through the global handler.
+//This is the standard pattern in Spring applications.
