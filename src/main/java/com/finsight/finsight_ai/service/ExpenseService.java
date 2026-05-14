@@ -24,6 +24,8 @@ public class ExpenseService {
 
     private final ExpenseRepository expenseRepository;
     private final UserRepository userRepository;
+    private final BudgetService budgetService;
+
 
     // Helper — gets the currently logged-in user from SecurityContext
     //-------------- get the user by Email ---------------------------
@@ -51,6 +53,14 @@ public class ExpenseService {
                 .build();
 
         Expense saved = expenseRepository.save(expense);
+
+        budgetService.checkBudgetAlert(
+                user,
+                saved.getCategory(),
+                saved.getExpenseDate().getMonthValue(),
+                saved.getExpenseDate().getYear()
+        );
+
         return toResponse(saved);
     }
 
