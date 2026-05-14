@@ -1,4 +1,4 @@
-package com.finsight.finsight_ai.dto;
+package com.finsight.finsight_ai.dto.response;
 
 import lombok.Builder;
 import lombok.Data;
