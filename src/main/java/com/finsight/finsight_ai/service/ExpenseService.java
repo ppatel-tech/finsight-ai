@@ -5,6 +5,8 @@ import com.finsight.finsight_ai.dto.response.ExpenseResponse;
 import com.finsight.finsight_ai.entity.Category;
 import com.finsight.finsight_ai.entity.Expense;
 import com.finsight.finsight_ai.entity.User;
+import com.finsight.finsight_ai.exception.AccessDeniedException;
+import com.finsight.finsight_ai.exception.ResourceNotFoundException;
 import com.finsight.finsight_ai.repository.ExpenseRepository;
 import com.finsight.finsight_ai.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +32,7 @@ public class ExpenseService {
         String email = SecurityContextHolder.getContext()
                 .getAuthentication().getName();
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
 
 
@@ -84,7 +86,7 @@ public class ExpenseService {
         User user = getCurrentUser();
 
         Expense expense = expenseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Expense not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Expense not found"));
 
         // SECURITY CHECK — user can only edit their own expenses
         if (!expense.getUser().getId().equals(user.getId())) {
@@ -108,10 +110,11 @@ public class ExpenseService {
         User user = getCurrentUser();
 
         Expense expense = expenseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Expense not found"));
+                .orElseThrow(() ->new ResourceNotFoundException("Expense not found"));
 
         if (!expense.getUser().getId().equals(user.getId())) {
-            throw new RuntimeException("Access denied");
+            throw new AccessDeniedException(
+                    "You don't have permission to access this expense");
         }
 
         expenseRepository.delete(expense);

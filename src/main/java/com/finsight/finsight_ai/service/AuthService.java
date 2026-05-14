@@ -5,6 +5,8 @@ import com.finsight.finsight_ai.dto.request.RegisterRequest;
 import com.finsight.finsight_ai.dto.response.AuthResponse;
 import com.finsight.finsight_ai.entity.RefreshToken;
 import com.finsight.finsight_ai.entity.User;
+import com.finsight.finsight_ai.exception.DuplicateResourceException;
+import com.finsight.finsight_ai.exception.ResourceNotFoundException;
 import com.finsight.finsight_ai.repository.RefreshTokenRepository;
 import com.finsight.finsight_ai.repository.UserRepository;
 import com.finsight.finsight_ai.security.JwtService;
@@ -36,7 +38,7 @@ public class AuthService {
     @Transactional
     public AuthResponse register(RegisterRequest request){
         if(userRepository.existsByEmail(request.getEmail())){
-            throw new RuntimeException("Email already registerd");
+            throw new DuplicateResourceException("Email already registered");
         }
 
         User user = User.builder()
@@ -74,7 +76,7 @@ public class AuthService {
         );
 
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() ->new RuntimeException("user not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
 
         String accessToken = jwtService.generateToken(user.getEmail());
