@@ -1,11 +1,9 @@
 package com.finsight.finsight_ai.controller;
-
 import com.finsight.finsight_ai.dto.response.MonthlyAnalyticsResponse;
 import com.finsight.finsight_ai.service.AnalyticsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.time.LocalDate;
 
 @RestController
