@@ -8,6 +8,7 @@ import com.finsight.finsight_ai.repository.ExpenseRepository;
 import com.finsight.finsight_ai.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -30,9 +31,11 @@ public class AnalyticsService {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
     }
-
-    public MonthlyAnalyticsResponse getMonthlyAnalytics(int month, int year) {
-        User user = getCurrentUser();
+    @Cacheable(
+            value = "analytics",
+            key = "'monthly_' + #user.id + '_' + #month + '_' + #year"
+    )
+    public MonthlyAnalyticsResponse getMonthlyAnalytics(User user, int month, int year) {
 
         // Total spent this month
         BigDecimal totalSpent = expenseRepository

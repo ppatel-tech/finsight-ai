@@ -10,6 +10,7 @@ import com.finsight.finsight_ai.exception.ResourceNotFoundException;
 import com.finsight.finsight_ai.repository.ExpenseRepository;
 import com.finsight.finsight_ai.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -41,6 +42,7 @@ public class ExpenseService {
 
     // ------------ Add expense -------------------------------
     @Transactional
+    @CacheEvict(value = "analytics", allEntries = true)
     public ExpenseResponse addExpense(ExpenseRequest request) {
         User user = getCurrentUser();
 
@@ -92,6 +94,7 @@ public class ExpenseService {
     // -------------------- Update Expenses -----------------------------
 
     @Transactional
+    @CacheEvict(value = "analytics", allEntries = true)
     public ExpenseResponse updateExpense(Long id, ExpenseRequest request) {
         User user = getCurrentUser();
 
@@ -116,6 +119,7 @@ public class ExpenseService {
     //---------------- Delete Expense --------------------------
 
     @Transactional
+    @CacheEvict(value = "analytics", allEntries = true)
     public void deleteExpense(Long id) {
         User user = getCurrentUser();
 
