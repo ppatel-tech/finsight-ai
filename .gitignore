@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# Never commit these
+application-prod.yml
+.env
+*.env
