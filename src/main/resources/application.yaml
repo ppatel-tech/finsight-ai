@@ -3,14 +3,14 @@ spring:
     name: finsight-ai
   data:
     redis:
-      host: localhost
+      host:  ${SPRING_DATA_REDIS_HOST:localhost}
       port: 6379
       connect-timeout: 2000ms
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/finsight_db
-    username: postgres
-    password: root
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/finsight_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:root}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -34,9 +34,9 @@ springdoc:
 
 application:
   jwt:
-    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
-    expiration: 900000        # 15 minutes in milliseconds
-    refresh-expiration: 604800000  # 7 days in milliseconds
+    secret: ${APPLICATION_JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+    expiration: ${APPLICATION_JWT_EXPIRATION:900000}       # 15 minutes in milliseconds
+    refresh-expiration: ${APPLICATION_JWT_REFRESH_EXPIRATION:604800000}  # 7 days in milliseconds
 
 
 logging:
