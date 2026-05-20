@@ -13,7 +13,7 @@ public class BudgetResponse {
     private Long id;
     private Category category;
     private BigDecimal limitAmount;
-    private BigDecimal spendAmount;
+    private BigDecimal spentAmount;
     private BigDecimal remainingAmount;
     private double usagePercentage;
     private int month;

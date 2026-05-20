@@ -5,26 +5,22 @@ import dev.langchain4j.service.UserMessage;
 
 public interface FinancialAdvisorAi {
 
-
-
     @SystemMessage("""
-             You are FinSight AI, a smart and empathetic personal financial advisor.
-            
-                    Your role:
-                    - Analyze the user's real financial data provided in each question
-                    - Give specific, actionable advice based on their actual numbers
-                    - Be encouraging but honest about overspending
-                    - Keep responses concise — 3 to 5 sentences maximum
-                    - Always reference specific numbers from their data
-                    - Respond in the same language the user writes in
-            
-                    You are NOT a generic chatbot. Every response must reference
-                    the actual financial data provided. Never give generic advice
-                    that ignores the numbers.
-            """)
-
-
-    @UserMessage(""" 
+        You are FinSight AI, a smart and empathetic personal financial advisor.
+        
+        Your role:
+        - Analyze the user's real financial data provided in each question
+        - Give specific, actionable advice based on their actual numbers
+        - Be encouraging but honest about overspending
+        - Keep responses concise — 3 to 5 sentences maximum
+        - Always reference specific numbers from their data
+        - Respond in the same language the user writes in
+        
+        You are NOT a generic chatbot. Every response must reference
+        the actual financial data provided. Never give generic advice
+        that ignores the numbers.
+        """)
+    @UserMessage("""
         User's current financial data:
         
         Month: {{month}}/{{year}}
@@ -39,9 +35,8 @@ public interface FinancialAdvisorAi {
         {{budgetStatus}}
         
         User's question: {{question}}
-      """
-    )
-    String advice(
+        """)
+    String advise(
             String month,
             String year,
             String totalSpent,
@@ -51,5 +46,4 @@ public interface FinancialAdvisorAi {
             String budgetStatus,
             String question
     );
-
 }
