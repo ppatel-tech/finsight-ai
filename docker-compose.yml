@@ -1,7 +1,4 @@
-version: '3.8'
-
 services:
-
   postgres:
     image: postgres:17-alpine
     container_name: finsight-postgres
@@ -10,7 +7,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -48,3 +45,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+volumes:
+  postgres_data:
+
