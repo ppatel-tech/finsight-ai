@@ -38,9 +38,9 @@ application:
     expiration: ${APPLICATION_JWT_EXPIRATION:900000}       # 15 minutes in milliseconds
     refresh-expiration: ${APPLICATION_JWT_REFRESH_EXPIRATION:604800000}  # 7 days in milliseconds
   ai:
-  gemini:
-    api-key: ${GEMINI_API_KEY:AIzaSyDaxdc_phWtZk3_ciGya5rWqQ3KkqzhSmw}
-    model: gemini-1.5-flash
+   gemini:
+    api-key: ${GEMINI_API_KEY:your api key here}
+    model: gemini-2.5-flash
     temperature: 0.7
 
 
