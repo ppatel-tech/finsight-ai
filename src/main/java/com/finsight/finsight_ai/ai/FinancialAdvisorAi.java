@@ -2,6 +2,7 @@ package com.finsight.finsight_ai.ai;
 
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
+import dev.langchain4j.service.V;
 
 public interface FinancialAdvisorAi {
 
@@ -37,13 +38,13 @@ public interface FinancialAdvisorAi {
         User's question: {{question}}
         """)
     String advise(
-            String month,
-            String year,
-            String totalSpent,
-            String dailyAverage,
-            String highestCategory,
-            String categoryBreakdown,
-            String budgetStatus,
-            String question
+            @V("month") String month,
+            @V("year") String year,
+            @V("totalSpent") String totalSpent,
+            @V("dailyAverage") String dailyAverage,
+            @V("highestCategory") String highestCategory,
+            @V("categoryBreakdown") String categoryBreakdown,
+            @V("budgetStatus") String budgetStatus,
+            @V("question") String question
     );
 }

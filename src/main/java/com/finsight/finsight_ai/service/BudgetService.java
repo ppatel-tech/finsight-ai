@@ -131,7 +131,7 @@ public class BudgetService {
                 .id(budget.getId())
                 .category(budget.getCategory())
                 .limitAmount(limit)
-                .spendAmount(spent)
+                .spentAmount(spent)
                 .remainingAmount(remaining)
                 .usagePercentage(Math.min(percentage, 100.0))
                 .month(budget.getMonth())
