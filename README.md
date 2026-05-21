@@ -283,7 +283,7 @@ Everything runs inside Docker.
 **1. Clone the repository**
 
 ```bash
-git clone https://github.com/your-username/finsight-ai.git
+git clone https://github.com/ppatel-tech/finsight-ai.git
 cd finsight-ai
 ```
 
