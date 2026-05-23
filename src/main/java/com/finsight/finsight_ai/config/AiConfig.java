@@ -1,5 +1,4 @@
 package com.finsight.finsight_ai.config;
-
 import com.finsight.finsight_ai.ai.FinancialAdvisorAi;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import dev.langchain4j.service.AiServices;

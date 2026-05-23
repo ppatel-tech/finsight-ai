@@ -1,5 +1,4 @@
 package com.finsight.finsight_ai.config;
-
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
