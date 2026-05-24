@@ -44,6 +44,8 @@ services:
       APPLICATION_JWT_EXPIRATION: 900000
       APPLICATION_JWT_REFRESH_EXPIRATION: 604800000
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
