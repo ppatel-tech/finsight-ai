@@ -26,6 +26,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BudgetService {
 
+    private final EmailService emailService;
     private final BudgetRepository budgetRepository;
     private final ExpenseRepository expenseRepository;
     private final UserRepository userRepository;
@@ -80,9 +81,11 @@ public class BudgetService {
         budgetRepository.findByUserAndCategoryAndMonthAndYear(
                         user, category, month, year)
                 .ifPresent(budget -> {
-                    BigDecimal spent = getSpentAmount(user, category, month, year);
+                    BigDecimal spent = getSpentAmount(
+                            user, category, month, year);
                     double percentage = spent
-                            .divide(budget.getLimitAmount(), 4, RoundingMode.HALF_UP)
+                            .divide(budget.getLimitAmount(),
+                                    4, RoundingMode.HALF_UP)
                             .multiply(BigDecimal.valueOf(100))
                             .doubleValue();
 
@@ -92,12 +95,32 @@ public class BudgetService {
                                 user.getEmail(), category, spent,
                                 budget.getLimitAmount(),
                                 String.format("%.1f", percentage));
+
+                        // Send real email
+                        emailService.sendBudgetExceededEmail(
+                                user.getEmail(),
+                                user.getName(),
+                                category.name(),
+                                spent.toString(),
+                                budget.getLimitAmount().toString()
+                        );
+
                     } else if (percentage >= WARNING_THRESHOLD) {
                         log.warn("BUDGET WARNING — User: {}, Category: {}, " +
                                         "Spent: {}, Limit: {}, Usage: {}%",
                                 user.getEmail(), category, spent,
                                 budget.getLimitAmount(),
                                 String.format("%.1f", percentage));
+
+                        // Send real email
+                        emailService.sendBudgetWarningEmail(
+                                user.getEmail(),
+                                user.getName(),
+                                category.name(),
+                                percentage,
+                                spent.toString(),
+                                budget.getLimitAmount().toString()
+                        );
                     }
                 });
     }
