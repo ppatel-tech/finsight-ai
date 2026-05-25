@@ -1,9 +1,21 @@
 # FinSight AI — Intelligent Financial Backend System
 
 > A production-grade, event-driven financial backend built with Java 21 and Spring Boot 3.
-> Goes beyond standard CRUD — monitors spending in real time, fires automated budget alerts,
-> caches analytics with Redis, generates PDF reports, and provides AI-powered financial advice
-> using Google Gemini through LangChain4j.
+> Goes beyond standard CRUD — monitors spending in real time, fires automated budget alerts
+> via real Gmail emails, caches analytics with Redis, generates PDF reports, manages database
+> schema with Flyway migrations, and provides AI-powered financial advice using Google Gemini
+> through LangChain4j. Fully Dockerized and deployed on AWS EC2.
+
+---
+
+## 🌐 Live Demo
+
+| | |
+|---|---|
+| **Swagger UI** | http://13.234.38.255:8080/swagger-ui/index.html |
+| **Health Check** | http://13.234.38.255:8080/api/health |
+
+> Deployed on AWS EC2 (t2.micro) — Ubuntu 24.04 LTS — Docker Compose stack
 
 ---
 
@@ -14,18 +26,13 @@
 - [Tech Stack](#tech-stack)
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
+- [Database Migrations](#database-migrations)
 - [Getting Started](#getting-started)
   - [Prerequisites](#prerequisites)
   - [Run with Docker](#run-with-docker)
   - [Run Locally](#run-locally)
 - [Environment Variables](#environment-variables)
 - [API Documentation](#api-documentation)
-  - [Authentication](#authentication)
-  - [Expenses](#expenses)
-  - [Budgets](#budgets)
-  - [Analytics](#analytics)
-  - [AI Advisor](#ai-advisor)
-  - [Reports](#reports)
 - [Key Design Decisions](#key-design-decisions)
 - [What I Learned](#what-i-learned)
 
@@ -37,8 +44,9 @@ Most expense trackers are passive — they store what you tell them and nothing 
 FinSight AI is different. It actively monitors your spending behavior and reacts.
 
 The system continuously tracks category-wise budgets, fires warnings when you cross
-80% of a limit, generates automated monthly PDF reports, and answers financial questions
-using AI that has access to your real transaction data — not generic advice.
+80% of a limit, sends real HTML emails directly to your Gmail inbox, generates automated
+monthly PDF reports, and answers financial questions using AI that has access to your
+real transaction data — not generic advice.
 
 Built as a learning project to simulate real-world enterprise backend engineering
 using modern Java and Spring Boot.
@@ -66,10 +74,13 @@ using modern Java and Spring Boot.
 - Unique constraint per user/category/month/year
 - Alert status: SAFE / WARNING / EXCEEDED
 
-**Event-Driven Budget Alerts**
+**Event-Driven Budget Alerts with Real Email Delivery**
 - Every expense addition automatically triggers a budget check
 - Logs WARNING at 80% usage, EXCEEDED at 100%
-- Spring Scheduler runs a daily sweep across all active budgets
+- Sends formatted HTML email to user's Gmail inbox automatically
+- Email delivery is async — expense response returns instantly, email sends in background
+- If email fails, expense is never affected — side effects never break core operations
+- Spring Scheduler runs a daily sweep across all active budgets at midnight
 
 **Analytics Engine**
 - Monthly total spending
@@ -89,22 +100,25 @@ using modern Java and Spring Boot.
 - Cache evicted automatically on expense create, update, delete
 - Zero database queries on cache hits
 
+**Database Migration with Flyway**
+- All schema changes managed through versioned SQL migration files
+- `ddl-auto` set to `validate` — Hibernate never modifies schema automatically
+- Full migration history tracked in `flyway_schema_history` table
+- Every environment runs identical schema — no drift between local and production
+- Existing migrations are immutable — changes always go in new migration files
+
 **PDF Reports**
 - Monthly report generated in memory using iText7
 - Includes summary, category breakdown table, budget performance
 - Downloaded directly via API — no file storage needed
 
-**Scheduler**
-- Daily cron job checks all active budgets at midnight
-- Fixed-rate job for development testing
-- Uses fixedDelay for sequential execution — no overlapping runs
-
-**Dockerized**
+**Dockerized & Cloud Deployed**
 - Multi-stage Dockerfile for minimal image size
 - Docker Compose orchestrates Spring Boot, PostgreSQL, Redis
 - Health checks ensure correct startup ordering
 - Volumes for PostgreSQL data persistence
 - Environment variable injection for all secrets
+- Deployed live on AWS EC2 — accessible via public IP
 
 ---
 
@@ -116,14 +130,17 @@ using modern Java and Spring Boot.
 | Framework | Spring Boot 3.5 |
 | Database | PostgreSQL 17 |
 | ORM | Hibernate / Spring Data JPA |
+| DB Migrations | Flyway |
 | Security | Spring Security 6 + JWT (jjwt 0.12) |
 | Cache | Redis 7 |
+| Email | Spring Boot Starter Mail + Gmail SMTP |
 | AI | Google Gemini via LangChain4j 0.36 |
 | PDF | iText7 |
 | Scheduler | Spring Scheduler |
 | Documentation | SpringDoc OpenAPI / Swagger UI |
 | Build | Maven |
 | Containerization | Docker + Docker Compose |
+| Cloud | AWS EC2 (Ubuntu 24.04 LTS) |
 
 ---
 
@@ -155,6 +172,7 @@ Client (Swagger / Frontend)
 └─────────────────────────────┘
          │
          ├──────────────────── Redis Cache (@Cacheable / @CacheEvict)
+         ├──────────────────── EmailService (@Async background thread)
          │
          ▼
 ┌─────────────────────────────┐
@@ -165,17 +183,18 @@ Client (Swagger / Frontend)
          ▼
 ┌─────────────────────────────┐
 │       PostgreSQL            │  users, expenses, budgets, refresh_tokens
-│   + Hibernate ORM           │  Running in Docker container
+│   + Hibernate ORM           │  Schema managed by Flyway migrations
+│   + Flyway                  │  Running in Docker container on AWS EC2
 └─────────────────────────────┘
 
 Cross-cutting:
 ├── GlobalExceptionHandler    (@RestControllerAdvice)
 ├── RequestLoggingFilter      (logs method, path, status, duration)
-├── BudgetAlertScheduler      (daily cron + fixed-rate background jobs)
+├── BudgetAlertScheduler      (daily cron + async email notifications)
 └── AiAdvisorService          (fetches context → calls Gemini → returns advice)
 ```
 
-**Request flow for `POST /api/expenses`:**
+**Complete request flow for `POST /api/expenses`:**
 
 1. Request hits embedded Tomcat on port 8080
 2. Spring Security FilterChainProxy intercepts
@@ -191,11 +210,14 @@ Cross-cutting:
 12. Hibernate generates INSERT SQL, executes against PostgreSQL container
 13. Data persisted on disk via Docker volume
 14. `@CacheEvict` clears stale analytics from Redis
-15. `BudgetService.checkBudgetAlert()` fires — logs WARNING or EXCEEDED if threshold crossed
-16. Entity mapped to `ExpenseResponse` DTO
-17. `ResponseEntity` wraps DTO with HTTP 201 CREATED
-18. Jackson serializes DTO to JSON
-19. Tomcat sends JSON response back to client
+15. `BudgetService.checkBudgetAlert()` fires — checks 80%/100% thresholds
+16. If threshold crossed — `EmailService` called
+17. `@Async` runs email delivery in background thread — main thread continues
+18. Entity mapped to `ExpenseResponse` DTO
+19. `ResponseEntity` wraps DTO with HTTP 201 CREATED
+20. Jackson serializes DTO to JSON
+21. Tomcat sends JSON response back to client instantly
+22. Email arrives in user's Gmail inbox seconds later (async)
 
 ---
 
@@ -205,12 +227,12 @@ Cross-cutting:
 src/main/java/com/finsight/finsight_ai/
 ├── FinsightAiApplication.java
 ├── ai/
-│   └── FinancialAdvisorAi.java          LangChain4j AI service interface
+│   └── FinancialAdvisorAi.java
 ├── config/
-│   ├── AiConfig.java                    Gemini + LangChain4j bean setup
-│   ├── RedisConfig.java                 Cache manager, TTL, JSON serializer
-│   ├── RequestLoggingConfig.java        Request/response logging filter
-│   └── SwaggerConfig.java              OpenAPI + JWT bearer auth setup
+│   ├── AiConfig.java
+│   ├── RedisConfig.java
+│   ├── RequestLoggingConfig.java
+│   └── SwaggerConfig.java
 ├── controller/
 │   ├── AiAdvisorController.java
 │   ├── AnalyticsController.java
@@ -261,9 +283,42 @@ src/main/java/com/finsight/finsight_ai/
     ├── AnalyticsService.java
     ├── AuthService.java
     ├── BudgetService.java
+    ├── EmailService.java
     ├── ExpenseService.java
     └── ReportService.java
+
+src/main/resources/
+├── application.yml
+└── db/
+    └── migration/
+        ├── V1__create_users_table.sql
+        ├── V2__create_refresh_tokens_table.sql
+        ├── V3__create_expenses_table.sql
+        ├── V4__create_budgets_table.sql
+        └── V5__add_indexes.sql
 ```
+
+---
+
+## Database Migrations
+
+Schema is managed by **Flyway** — not Hibernate auto-update.
+
+Every database change is a versioned SQL file that runs exactly once, in order,
+and is tracked in `flyway_schema_history`. This guarantees identical schema
+across all environments — local, team members, and production server.
+
+| Version | Description | Type |
+|---|---|---|
+| V1 | Create users table | Baseline |
+| V2 | Create refresh_tokens table with FK | SQL |
+| V3 | Create expenses table with FK | SQL |
+| V4 | Create budgets table with unique constraint | SQL |
+| V5 | Add indexes on user_id, category, expense_date | SQL |
+
+**Rule:** Never modify an existing migration file. Always add a new one.
+Flyway checksums every migration — any modification to an applied file
+causes startup failure to protect schema integrity.
 
 ---
 
@@ -273,9 +328,10 @@ src/main/java/com/finsight/finsight_ai/
 
 - Docker Desktop installed and running
 - Git
-- A Gemini API key from https://aistudio.google.com/app/apikey (free)
+- A Gemini API key — https://aistudio.google.com/app/apikey (free tier)
+- A Gmail account with App Password generated
 
-That's it. Java, PostgreSQL, and Redis do not need to be installed locally.
+Java, PostgreSQL, and Redis do not need to be installed locally.
 Everything runs inside Docker.
 
 ### Run with Docker
@@ -283,15 +339,24 @@ Everything runs inside Docker.
 **1. Clone the repository**
 
 ```bash
-git clone https://github.com/ppatel-tech/finsight-ai.git
+git clone https://github.com/your-username/finsight-ai.git
 cd finsight-ai
 ```
 
 **2. Create a `.env` file in the project root**
 
 ```env
+SPRING_DATASOURCE_USERNAME=postgres
+SPRING_DATASOURCE_PASSWORD=postgres
+MAIL_USERNAME=your.gmail@gmail.com
+MAIL_PASSWORD=your_16_char_app_password
 GEMINI_API_KEY=your_gemini_api_key_here
+APPLICATION_JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+APPLICATION_JWT_EXPIRATION=900000
+APPLICATION_JWT_REFRESH_EXPIRATION=604800000
 ```
+
+> Gmail App Password: Google Account → Security → 2-Step Verification → App Passwords
 
 **3. Start all containers**
 
@@ -315,19 +380,16 @@ http://localhost:8080/swagger-ui/index.html
 **5. Stop everything**
 
 ```bash
+# Stop containers
 docker-compose down
-```
 
-To also wipe the database:
-```bash
+# Stop and wipe database
 docker-compose down -v
 ```
 
 ---
 
 ### Run Locally
-
-If you prefer to run without Docker:
 
 **Prerequisites:** Java 21, Maven, PostgreSQL 17, Redis 7
 
@@ -337,13 +399,15 @@ If you prefer to run without Docker:
 CREATE DATABASE finsight_db;
 ```
 
-**2. Set environment variables** (or update `application.yml` directly for dev)
+**2. Set environment variables**
 
 ```bash
 export SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/finsight_db
 export SPRING_DATASOURCE_USERNAME=postgres
 export SPRING_DATASOURCE_PASSWORD=your_password
 export SPRING_DATA_REDIS_HOST=localhost
+export MAIL_USERNAME=your.gmail@gmail.com
+export MAIL_PASSWORD=your_app_password
 export GEMINI_API_KEY=your_gemini_api_key
 export APPLICATION_JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
 ```
@@ -358,23 +422,28 @@ mvn spring-boot:run
 
 ## Environment Variables
 
-| Variable | Description | Default |
+| Variable | Description | Required |
 |---|---|---|
-| `SPRING_DATASOURCE_URL` | PostgreSQL JDBC URL | `jdbc:postgresql://localhost:5432/finsight_db` |
-| `SPRING_DATASOURCE_USERNAME` | PostgreSQL username | `postgres` |
-| `SPRING_DATASOURCE_PASSWORD` | PostgreSQL password | `postgres` |
-| `SPRING_DATA_REDIS_HOST` | Redis hostname | `localhost` |
-| `APPLICATION_JWT_SECRET` | 256-bit hex secret for JWT signing | (see yml) |
-| `APPLICATION_JWT_EXPIRATION` | Access token TTL in ms | `900000` (15 min) |
-| `APPLICATION_JWT_REFRESH_EXPIRATION` | Refresh token TTL in ms | `604800000` (7 days) |
-| `GEMINI_API_KEY` | Google Gemini API key | required |
+| `SPRING_DATASOURCE_URL` | PostgreSQL JDBC URL | Yes |
+| `SPRING_DATASOURCE_USERNAME` | PostgreSQL username | Yes |
+| `SPRING_DATASOURCE_PASSWORD` | PostgreSQL password | Yes |
+| `SPRING_DATA_REDIS_HOST` | Redis hostname | Yes |
+| `APPLICATION_JWT_SECRET` | 256-bit hex secret for JWT signing | Yes |
+| `APPLICATION_JWT_EXPIRATION` | Access token TTL in ms — default 900000 (15 min) | Yes |
+| `APPLICATION_JWT_REFRESH_EXPIRATION` | Refresh token TTL in ms — default 604800000 (7 days) | Yes |
+| `GEMINI_API_KEY` | Google Gemini API key | Yes |
+| `MAIL_USERNAME` | Gmail address used for sending alerts | Yes |
+| `MAIL_PASSWORD` | Gmail App Password — 16 characters | Yes |
+
+> Never commit `.env` to version control. It is in `.gitignore`.
 
 ---
 
 ## API Documentation
 
-Full interactive documentation available at `/swagger-ui/index.html`.
-Use the **Authorize** button to set your JWT token for protected endpoints.
+Full interactive documentation: `/swagger-ui/index.html`
+
+Use the **Authorize** button to set your JWT token for all protected endpoints.
 
 ### Authentication
 
@@ -392,7 +461,7 @@ Use the **Authorize** button to set your JWT token for protected endpoints.
 }
 ```
 
-**Login / Register response:**
+**Response:**
 ```json
 {
   "accessToken": "eyJhbGci...",
@@ -412,7 +481,10 @@ Use the **Authorize** button to set your JWT token for protected endpoints.
 | GET | `/api/expenses` | Yes | Get paginated expenses |
 | GET | `/api/expenses?category=FOOD` | Yes | Filter by category |
 | PUT | `/api/expenses/{id}` | Yes | Update expense |
-| DELETE | `/api/expenses/{id}` | Yes | Delete expense |
+| DELETE | `/api/expenses/{id}` | Yes | Delete expense — returns 204 |
+
+Available categories: `FOOD` `TRANSPORT` `ENTERTAINMENT` `SHOPPING`
+`HEALTHCARE` `UTILITIES` `EDUCATION` `OTHER`
 
 **Add expense request:**
 ```json
@@ -420,15 +492,11 @@ Use the **Authorize** button to set your JWT token for protected endpoints.
   "amount": 450.00,
   "description": "Lunch with team",
   "category": "FOOD",
-  "expenseDate": "2026-05-21"
+  "expenseDate": "2026-05-24"
 }
 ```
 
-Available categories: `FOOD`, `TRANSPORT`, `ENTERTAINMENT`, `SHOPPING`,
-`HEALTHCARE`, `UTILITIES`, `EDUCATION`, `OTHER`
-
-**Paginated response includes:** `content`, `totalElements`, `totalPages`,
-`number`, `size`
+Paginated response includes: `content`, `totalElements`, `totalPages`, `number`, `size`
 
 ---
 
@@ -436,34 +504,27 @@ Available categories: `FOOD`, `TRANSPORT`, `ENTERTAINMENT`, `SHOPPING`,
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| POST | `/api/budgets` | Yes | Create monthly budget |
+| POST | `/api/budgets` | Yes | Create monthly category budget |
 | GET | `/api/budgets` | Yes | Get budgets for current month |
-| GET | `/api/budgets?month=5&year=2026` | Yes | Get budgets for specific month |
+| GET | `/api/budgets?month=5&year=2026` | Yes | Specific month |
 
-**Create budget request:**
-```json
-{
-  "category": "FOOD",
-  "limitAmount": 5000.00,
-  "month": 5,
-  "year": 2026
-}
-```
-
-**Budget response includes live utilization:**
+**Budget response with live utilization:**
 ```json
 {
   "id": 1,
   "category": "FOOD",
-  "limitAmount": 5000.00,
-  "spentAmount": 4200.00,
-  "remainingAmount": 800.00,
-  "usagePercentage": 84.0,
+  "limitAmount": 1500.00,
+  "spentAmount": 1200.00,
+  "remainingAmount": 300.00,
+  "usagePercentage": 80.0,
   "month": 5,
   "year": 2026,
   "alertStatus": "WARNING"
 }
 ```
+
+When `usagePercentage` crosses 80% — warning email sent to user's Gmail.
+When it crosses 100% — budget exceeded email sent.
 
 ---
 
@@ -471,7 +532,7 @@ Available categories: `FOOD`, `TRANSPORT`, `ENTERTAINMENT`, `SHOPPING`,
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/api/analytics/monthly` | Yes | Monthly spending analytics |
+| GET | `/api/analytics/monthly` | Yes | Current month analytics |
 | GET | `/api/analytics/monthly?month=5&year=2026` | Yes | Specific month |
 
 **Response:**
@@ -497,8 +558,7 @@ Available categories: `FOOD`, `TRANSPORT`, `ENTERTAINMENT`, `SHOPPING`,
 }
 ```
 
-Results are cached in Redis for 10 minutes. Cache is invalidated automatically
-on any expense change.
+Results cached in Redis for 10 minutes. Cache invalidated on any expense change.
 
 ---
 
@@ -506,7 +566,7 @@ on any expense change.
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| POST | `/api/ai/advice` | Yes | Get AI financial advice |
+| POST | `/api/ai/advice` | Yes | Get personalized financial advice |
 
 **Request:**
 ```json
@@ -515,7 +575,7 @@ on any expense change.
 }
 ```
 
-**Response:**
+**Real response from Gemini:**
 ```json
 {
   "question": "Am I on track with my budget this month?",
@@ -528,8 +588,8 @@ on any expense change.
 }
 ```
 
-The AI receives your actual spending data, budget status, and category breakdown
-before generating a response. Every answer references your real numbers.
+Every response references the user's actual spending numbers — not generic advice.
+The AI receives real category breakdown, budget status, and totals before answering.
 
 ---
 
@@ -537,11 +597,12 @@ before generating a response. Every answer references your real numbers.
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/api/reports/monthly` | Yes | Download monthly PDF report |
+| GET | `/api/reports/monthly` | Yes | Download current month PDF |
 | GET | `/api/reports/monthly?month=5&year=2026` | Yes | Specific month PDF |
 
-Returns a PDF file download. Report includes total spending summary,
+Returns a formatted PDF file download. Includes spending summary,
 category breakdown table, and budget performance.
+Generated entirely in memory — no server-side file storage required.
 
 ---
 
@@ -549,14 +610,14 @@ category breakdown table, and budget performance.
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/api/health` | No | System health + DB status |
+| GET | `/api/health` | No | System health and DB status |
 
 ```json
 {
   "status": "UP",
   "service": "FinSight AI",
   "version": "1.0",
-  "timestamp": "2026-05-21T10:00:00",
+  "timestamp": "2026-05-24T10:00:00",
   "database": "UP"
 }
 ```
@@ -566,38 +627,54 @@ category breakdown table, and budget performance.
 ## Key Design Decisions
 
 **Why JWT over sessions?**
-JWT is stateless — the server stores nothing per user. Any server instance can
-validate any token independently. This makes the system horizontally scalable
-with zero shared session state.
+JWT is stateless — the server stores nothing per user. Any server instance
+can validate any token independently. Horizontally scalable with zero shared state.
 
 **Why two tokens (access + refresh)?**
-Access tokens expire in 15 minutes — short enough that a stolen token has
-limited usefulness. But forcing re-login every 15 minutes is bad UX.
-Refresh tokens (7 days, stored in DB) allow silent renewal. They can also be
-revoked by deleting the database row — something you cannot do with a JWT.
+Access tokens expire in 15 minutes — limited damage if stolen. Refresh tokens
+(7 days, stored in DB) allow silent renewal and can be revoked by deleting
+the database row — something impossible with a stateless JWT.
+
+**Why Flyway over `ddl-auto: update`?**
+`ddl-auto: update` never deletes columns, has no history, and causes schema drift
+between environments. Flyway gives every change a version number, a checksum,
+and a timestamp. Every environment runs identical SQL in identical order.
+Flyway refuses to start if an applied migration is modified — protecting
+schema history from silent corruption.
+
+**Why `@Async` for email alerts?**
+Gmail SMTP calls take 1-3 seconds. Without `@Async`, every expense addition
+would block the response thread waiting for email delivery. With `@Async`,
+the expense saves and responds in milliseconds while email delivers in a
+background thread. Email failure never rolls back a successful expense save —
+side effects never break core operations.
 
 **Why BigDecimal for money?**
-Floating point arithmetic cannot represent 0.1 exactly in binary.
-`0.1 + 0.2 = 0.30000000000000004` in IEEE 754. For financial data,
-this is unacceptable. `BigDecimal` with `DECIMAL(10,2)` in PostgreSQL
-guarantees exact arithmetic.
+Floating point cannot represent 0.1 exactly in binary.
+`0.1 + 0.2 = 0.30000000000000004` in IEEE 754. For financial data this is
+unacceptable. `BigDecimal` with `DECIMAL(10,2)` in PostgreSQL guarantees
+exact arithmetic.
 
 **Why DTOs instead of exposing entities?**
-Entities are database representations. APIs are contracts with clients.
-Mixing them means a database schema change breaks your API.
-DTOs also prevent mass assignment vulnerabilities — a client cannot
-inject `role: ADMIN` if your request DTO has no role field.
+Entities are database representations. DTOs are API contracts. Keeping them
+separate means database schema changes don't break the API. DTOs also prevent
+mass assignment — a client cannot inject `role: ADMIN` if the request DTO
+has no role field.
+
+**Why format AI context as strings not raw JSON?**
+LLMs are trained on human language. `"FOOD: ₹4200 of ₹5000 (84%) — WARNING"`
+is more natural than a raw JSON object. This also reduces token usage —
+no field names, brackets, or structural overhead. Better accuracy,
+lower cost, faster responses.
 
 **Why Redis cache with eviction instead of longer TTL?**
-Analytics data changes every time an expense is added. A long TTL
-means users see stale totals. Eviction-on-write gives you the performance
-benefit of caching with the correctness of always-fresh data.
+Analytics change every time an expense is added. Eviction-on-write gives
+the performance benefit of caching with the correctness of always-fresh data.
 
-**Why format context as strings for the AI prompt?**
-LLMs are trained on human language, not JSON structure. Formatted strings
-like `"FOOD: ₹4200 of ₹5000 (84%) — WARNING"` are more natural than raw
-JSON objects. This also reduces token usage — no field names, brackets,
-or structural overhead. Better accuracy, lower cost, faster responses.
+**Why EC2 over serverless?**
+The app is Dockerized with a full stack. EC2 runs the exact same
+`docker-compose up` as local development — zero rewriting, zero new
+deployment paradigms. Simpler, faster, and demonstrates real Docker skills.
 
 ---
 
@@ -608,27 +685,36 @@ Building FinSight AI covered the full spectrum of backend engineering:
 - **Layered architecture** — strict separation between controllers, services,
   repositories, DTOs, and entities
 - **JWT internals** — header, payload, signature, stateless auth, token rotation
-- **Spring Security filter chain** — how requests flow through filters before
-  reaching controllers
+- **Spring Security filter chain** — how every request flows through filters
+  before reaching controllers
 - **JPA and Hibernate** — entity relationships, lazy loading, JPQL, constructor
   projections, transaction management
+- **Flyway migrations** — versioned schema management, why immutable history
+  matters, the difference between validate and update
 - **Event-driven design** — expense creation triggering budget checks without
-  tight coupling
+  tight coupling between services
+- **Async processing** — `@Async` for non-blocking side effects, why email
+  delivery must never block core operations
 - **Redis caching** — cache-aside pattern, TTL, invalidation on write
 - **Docker networking** — why containers use service names not localhost,
   health checks, volume persistence
+- **AWS EC2 deployment** — SSH, security groups, port configuration,
+  running production workloads on cloud infrastructure
 - **AI integration** — prompt engineering, context injection, LangChain4j
   service interfaces
 - **Production practices** — graceful shutdown, structured logging,
-  global exception handling, environment variable configuration
+  global exception handling, environment variable configuration,
+  Gmail SMTP with App Passwords
 
 ---
 
 ## Author
 
 **Purushottam Patel**
-Backend Engineer in Training
+Backend Engineer
+
+GitHub: https://github.com/ppatel-tech
 
 ---
 
-*Built with Java 21 · Spring Boot 3 · PostgreSQL · Redis · Docker · LangChain4j · Google Gemini*
+*Built with Java 21 · Spring Boot 3 · PostgreSQL · Redis · Flyway · Docker · AWS EC2 · LangChain4j · Google Gemini*
