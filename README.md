@@ -12,8 +12,8 @@
 
 | | |
 |---|---|
-| **Swagger UI** | http://13.234.38.255:8080/swagger-ui/index.html |
-| **Health Check** | http://13.234.38.255:8080/api/health |
+| **Swagger UI** | https://finsight-ai-ivto.onrender.com/swagger-ui/index.html|
+| **Health Check** | https://finsight-ai-ivto.onrender.com/api/health |
 
 > Deployed on AWS EC2 (t2.micro) — Ubuntu 24.04 LTS — Docker Compose stack
 
