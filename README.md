@@ -4,7 +4,7 @@
 > Goes beyond standard CRUD — monitors spending in real time, fires automated budget alerts
 > via real Gmail emails, caches analytics with Redis, generates PDF reports, manages database
 > schema with Flyway migrations, and provides AI-powered financial advice using Google Gemini
-> through LangChain4j. Fully Dockerized and deployed on AWS EC2.
+> through LangChain4j. Fully Dockerized and deployed on AWS Render (Web Service & PostgreSQL) and Upstash (Redis).
 
 ---
 
@@ -15,7 +15,7 @@
 | **Swagger UI** | https://finsight-ai-ivto.onrender.com/swagger-ui/index.html|
 | **Health Check** | https://finsight-ai-ivto.onrender.com/api/health |
 
-> Deployed on AWS EC2 (t2.micro) — Ubuntu 24.04 LTS — Docker Compose stack
+> Deployed on Render (Web Service & PostgreSQL) and Upstash (Redis)
 
 ---
 
@@ -118,7 +118,7 @@ using modern Java and Spring Boot.
 - Health checks ensure correct startup ordering
 - Volumes for PostgreSQL data persistence
 - Environment variable injection for all secrets
-- Deployed live on AWS EC2 — accessible via public IP
+- Deployed live on Render (Free Tier) — Multi-stage Docker Architecture
 
 ---
 
@@ -140,7 +140,7 @@ using modern Java and Spring Boot.
 | Documentation | SpringDoc OpenAPI / Swagger UI |
 | Build | Maven |
 | Containerization | Docker + Docker Compose |
-| Cloud | AWS EC2 (Ubuntu 24.04 LTS) |
+| Cloud/hosting | Render (App & DB) + Upstash (Redis) |
 
 ---
 
@@ -184,7 +184,7 @@ Client (Swagger / Frontend)
 ┌─────────────────────────────┐
 │       PostgreSQL            │  users, expenses, budgets, refresh_tokens
 │   + Hibernate ORM           │  Schema managed by Flyway migrations
-│   + Flyway                  │  Running in Docker container on AWS EC2
+│   + Flyway                  │  Running in Docker container on Render (App & DB) + Upstash (Redis)
 └─────────────────────────────┘
 
 Cross-cutting:
@@ -698,8 +698,7 @@ Building FinSight AI covered the full spectrum of backend engineering:
 - **Redis caching** — cache-aside pattern, TTL, invalidation on write
 - **Docker networking** — why containers use service names not localhost,
   health checks, volume persistence
-- **AWS EC2 deployment** — SSH, security groups, port configuration,
-  running production workloads on cloud infrastructure
+- **Render (App & DB) + Upstash (Redis)**
 - **AI integration** — prompt engineering, context injection, LangChain4j
   service interfaces
 - **Production practices** — graceful shutdown, structured logging,
